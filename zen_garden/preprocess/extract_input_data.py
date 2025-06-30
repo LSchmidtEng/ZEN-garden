@@ -89,6 +89,7 @@ class DataInput:
         # copy output data as otherwise overwritten
         df_output_generic = df_output.copy()
         if time_steps == "set_base_time_steps_yearly":
+            #ToDo choose here to pass on f_name instead of file_name so that for each scenario we can extratct year-specific ts
             self.extract_year_specific_ts(file_name, index_name_list, time_steps, subelement, default_value,df_output_generic=df_output)
         # finally apply the scenario_factor and return df_output
         return df_output_generic*scenario_factor
@@ -350,7 +351,7 @@ class DataInput:
         file_names = os.listdir(self.folder_path)
         for file in file_names:
             for i,year in enumerate(years):
-                filename = file_name + "_" + year
+                filename = file_name + "_" + year  #ToDO make this less hardcoded
                 if filename in file:
                     # read input data
                     f_name, scenario_factor = self.scenario_dict.get_param_file(self.element.name, filename)

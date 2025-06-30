@@ -14,6 +14,8 @@ from .postprocess.postprocess import Postprocess
 from .utils import setup_logger, InputDataChecks, StringUtils, ScenarioUtils, OptimizationError
 from .preprocess.unit_handling import Scaling
 
+import time
+
 # we setup the logger here
 setup_logger()
 
@@ -61,6 +63,7 @@ def main(config, dataset_path=None, job_index=None, folder_output_path=None):
     ScenarioUtils.clean_scenario_folder(config, out_folder)
     ### ITERATE THROUGH SCENARIOS
     for scenario, scenario_dict in zip(scenarios, elements):
+        #t0 = time.perf_counter()
         # FORMULATE THE OPTIMIZATION PROBLEM
         # add the scenario_dict and read input data
         optimization_setup = OptimizationSetup(config, scenario_dict=scenario_dict, input_data_checks=input_data_checks)
@@ -83,6 +86,9 @@ def main(config, dataset_path=None, job_index=None, folder_output_path=None):
             if not optimization_setup.optimality:
                 # write IIS
                 optimization_setup.write_IIS()
+                #ToDO remove this later! -> only to avoid crash of MILP runs
+                print("--- Optimization infeasible ---")
+                continue
                 raise OptimizationError(optimization_setup.model.termination_condition)
             if optimization_setup.solver.use_scaling:
                 optimization_setup.scaling.re_scale()
@@ -96,5 +102,7 @@ def main(config, dataset_path=None, job_index=None, folder_output_path=None):
             # write results
             Postprocess(optimization_setup, scenarios=config.scenarios, subfolder=subfolder,
                         model_name=model_name, scenario_name=scenario_name, param_map=param_map)
+            #t1 = time.perf_counter()
+            #logging.info(f"\nTime to run scenario: {t1 - t0:0.1f} seconds\n")
     logging.info("--- Optimization finished ---")
     return optimization_setup

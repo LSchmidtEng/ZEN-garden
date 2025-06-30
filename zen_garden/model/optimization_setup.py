@@ -506,6 +506,10 @@ class OptimizationSetup(object):
                              keep_files=self.solver.keep_files, sanitize_zeros=True,
                              # remaining kwargs are passed to the solver
                              **solver_options)
+        elif solver_name == "highs":
+            self.model.solve(solver_name=solver_name, io_api=self.solver.io_api,
+                             keep_files=self.solver.keep_files, sanitize_zeros=True,
+                             **solver_options)
         else:
             self.model.solve(solver_name=solver_name, io_api=self.solver.io_api,
                              keep_files=self.solver.keep_files, sanitize_zeros=True)

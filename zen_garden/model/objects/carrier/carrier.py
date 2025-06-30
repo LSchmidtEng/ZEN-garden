@@ -127,6 +127,11 @@ class Carrier(Element):
         variables.add_variable(model, name="cost_shed_demand", index_sets=cls.create_custom_set(["set_carriers", "set_nodes", "set_time_steps_operation"], optimization_setup), bounds=(0,np.inf),
                                doc="shed demand of carrier", unit_category={"money": 1, "time": -1})
 
+        #ToDo: delete later: implemented for cases of simultaneous import and export but solving time is too long
+        # binary for not the import and export at the same time
+        #variables.add_variable(model, name="binary_import_export", index_sets=cls.create_custom_set(["set_nodes", "set_time_steps_operation"], optimization_setup), binary=True,doc="binary variable to limit import and export at the same time", unit_category=None)
+
+
         # add pe.Sets of the child classes
         for subclass in cls.__subclasses__():
             if np.size(optimization_setup.system[subclass.label]):
@@ -163,6 +168,11 @@ class Carrier(Element):
         # energy balance
         rules.constraint_nodal_energy_balance()
 
+        #ToDo delete later: implemented for cases of simultaneous import and export but solving time is too long
+        # import and export at the same time
+        #rules.constraint_simultaneous_import_export("electricity","electricity_PV")
+        #rules.constraint_combined_import_export("electricity","electricity_PV")
+
         # add pe.Sets of the child classes
         for subclass in cls.__subclasses__():
             if len(optimization_setup.system[subclass.label]) > 0:
@@ -185,6 +195,36 @@ class CarrierRules(GenericRule):
 
     # Rule-based constraints
     # ----------------------
+
+    def constraint_simultaneous_import_export(self,carr1,carr2):
+        """
+        carrier import and export at the same time
+        """
+        # carr1 limit
+        lhs = self.variables["flow_import"].loc[carr1,:,:]
+        rhs = self.parameters.availability_import.loc[carr1,:,:] * self.variables["binary_import_export"]
+        constraints = lhs <= rhs
+
+        self.constraints.add_constraint("constraint_simultaneous_import_export_import",constraints)
+
+        # carr2 limit
+        lhs = self.variables["flow_export"].loc[carr2,:,:] + self.parameters.availability_export.loc[carr2,:,:] * self.variables["binary_import_export"]
+        rhs = self.parameters.availability_export.loc[carr2,:,:]
+        constraints = lhs <= rhs
+
+        self.constraints.add_constraint("constraint_simultaneous_import_export_export",constraints)
+
+    def constraint_combined_import_export(self,carr1,carr2):
+        """
+        Combined import of carrier1 and export of carrier2 lower than threshold. For modeling that during an hour we cannot draw and export at the same time from the grid
+
+        """
+        lhs = self.variables["flow_import"].loc[carr1,:,:] + self.variables["flow_export"].loc[carr2,:,:]
+        rhs = self.parameters.availability_import.loc[carr1,:,:]
+        constraints = lhs <= rhs
+        self.constraints.add_constraint("constraint_combined_import_export",constraints)
+
+
 
     def constraint_cost_carrier_total(self):
         """ total cost of importing and exporting carrier
@@ -287,6 +327,7 @@ class CarrierRules(GenericRule):
 
         self.constraints.add_constraint("constraint_availability_import_yearly",constraints_imp)
         self.constraints.add_constraint("constraint_availability_export_yearly",constraints_exp)
+
 
     def constraint_cost_carrier(self):
         """ cost of importing and exporting carrier

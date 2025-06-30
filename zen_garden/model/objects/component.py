@@ -794,7 +794,6 @@ class Constraint(Component):
                 self.docs[name] = self.compile_doc_string(doc, index_list=list(constraint.indexes), name= name)
             else:
                 raise TypeError(f"Constraint {name} has wrong format. Must be either a linopy constraint or a dictionary of constraints but is {type(constraint).__name__}")
-
         else:
             logging.warning(f"{name} already added. Can only be added once")
 

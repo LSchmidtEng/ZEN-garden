@@ -70,6 +70,8 @@ class StorageTechnology(Technology):
         self.raw_time_series["max_load_energy"] = self.data_input.extract_input_data("max_load_energy", index_sets=["set_nodes", "set_time_steps"], time_steps="set_base_time_steps_yearly", unit_category={})
         # add flow_storage_inflow time series
         self.raw_time_series["flow_storage_inflow"] = self.data_input.extract_input_data("flow_storage_inflow", index_sets=["set_nodes", "set_time_steps"], time_steps="set_base_time_steps_yearly", unit_category={"energy_quantity": 1, "time": -1})
+        #ToDo add here forced SOC for EVs (as proportion of max SOC)
+        self.raw_time_series["fixed_SOC"] = self.data_input.extract_input_data("fixed_SOC",index_sets=["set_nodes","set_time_steps"],time_steps="set_base_time_steps_yearly",unit_category={})
 
     def convert_to_fraction_of_capex(self):
         """ this method converts the total capex to fraction of capex, depending on how many hours per year are calculated """
@@ -119,6 +121,8 @@ class StorageTechnology(Technology):
         optimization_setup.parameters.add_parameter(name="self_discharge", index_names=["set_storage_technologies", "set_nodes"], doc='self discharge of storage technologies', calling_class=cls)
         # capex specific
         optimization_setup.parameters.add_parameter(name="capex_specific_storage", index_names=["set_storage_technologies", "set_capacity_types", "set_nodes", "set_time_steps_yearly"], capacity_types=True, doc='specific capex of storage technologies', calling_class=cls)
+        #ToDo add here fixed SOC for EVs
+        optimization_setup.parameters.add_parameter(name="fixed_SOC", index_names=["set_storage_technologies", "set_nodes", "set_time_steps_storage"], doc='fixed SOC of storage technologies', calling_class=cls)
 
     @classmethod
     def construct_vars(cls, optimization_setup):
@@ -185,6 +189,9 @@ class StorageTechnology(Technology):
         # Linear Capex
         rules.constraint_storage_technology_capex()
 
+        #Add fixed SOC for EVs
+        rules.constraint_enforce_SOC()
+
 class StorageTechnologyRules(GenericRule):
     """
     Rules for the StorageTechnology class
@@ -198,6 +205,46 @@ class StorageTechnologyRules(GenericRule):
         """
 
         super().__init__(optimization_setup)
+
+    #ToDo add here constraint for forced storage level for EVs
+    def constraint_enforce_SOC(self):
+        """
+        Constraint that enforces the state of charge of storage technologies. For modeling EVs that are plugged in at a certain time.
+        """
+
+        ### mask for finite SOC level
+        mask = self.parameters.fixed_SOC != np.inf
+
+        techs = self.sets["set_storage_technologies"]
+        nodes = self.sets["set_nodes"]
+        if len(techs) == 0:
+            return
+        # mask for energy capacity and storage time steps
+        times = self.get_storage2year_time_step_array()
+        capacity = self.map_and_expand(self.variables["capacity"], times)
+        capacity = capacity.rename({"set_technologies": "set_storage_technologies", "set_location": "set_nodes"})
+        capacity = capacity.sel({"set_nodes": nodes, "set_storage_technologies": techs})
+        storage_level = self.variables["storage_level"]
+        mask_capacity_type = self.variables["capacity"].coords["set_capacity_types"] == "energy"
+        fixed_SOC = self.parameters.fixed_SOC
+        fixed_SOC_upper = fixed_SOC.where(mask, 1.0)
+        fixed_SOC_lower = fixed_SOC.where(mask, 0.0)
+
+        #constraint storage_level == fixed_SOC * capacity
+        #upper bound storage_level <= fixed_SOC * capacity else capacity
+        #lower bound storage_level >= fixed_SOC * capacity else 0
+
+        #upper bound storage_level
+        lhs = (storage_level - fixed_SOC_upper*capacity).where(mask_capacity_type, 0.0)
+        rhs = 0
+        constraint_upper = lhs <= rhs
+
+        lhs = (storage_level - fixed_SOC_lower*capacity).where(mask_capacity_type, 0.0)
+        rhs = 0
+        constraint_lower = lhs >= rhs
+
+        self.constraints.add_constraint("constraint_enforce_SOC_upper_bound", constraint_upper)
+        self.constraints.add_constraint("constraint_enforce_SOC_lower_bound", constraint_lower)
 
     def constraint_capacity_factor_storage(self):
         """ Load is limited by the installed capacity and the maximum load factor for storage technologies
