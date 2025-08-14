@@ -357,6 +357,7 @@ class DataInput:
         # files to check
         file_names = os.listdir(self.folder_path)
         for file in file_names:
+            break #ToDo remove this line to extract year specific time series -> this is disabled for the purposes of large scenario calculations
             for i,year in enumerate(years):
                 filename = file_name + "_" + year  #ToDO make this less hardcoded
                 if filename in file:

@@ -128,8 +128,9 @@ class Carrier(Element):
                                doc="shed demand of carrier", unit_category={"money": 1, "time": -1})
 
         #ToDo: delete later: implemented for cases of simultaneous import and export but solving time is too long
-        # binary for not the import and export at the same time
-        #variables.add_variable(model, name="binary_import_export", index_sets=cls.create_custom_set(["set_nodes", "set_time_steps_operation"], optimization_setup), binary=True,doc="binary variable to limit import and export at the same time", unit_category=None)
+        if optimization_setup.system.import_export_binary:
+            # binary for not the import and export at the same time
+            variables.add_variable(model, name="binary_import_export", index_sets=cls.create_custom_set(["set_nodes", "set_time_steps_operation"], optimization_setup), binary=True,doc="binary variable to avoid import and export at the same time", unit_category=None)
 
 
         # add pe.Sets of the child classes
@@ -170,8 +171,8 @@ class Carrier(Element):
 
         #ToDo delete later: implemented for cases of simultaneous import and export but solving time is too long
         # import and export at the same time
-        #rules.constraint_simultaneous_import_export("electricity","electricity_PV")
-        #rules.constraint_combined_import_export("electricity","electricity_PV")
+        if optimization_setup.system.import_export_binary:
+            rules.constraint_simultaneous_import_export()
 
         # add pe.Sets of the child classes
         for subclass in cls.__subclasses__():
@@ -196,20 +197,24 @@ class CarrierRules(GenericRule):
     # Rule-based constraints
     # ----------------------
 
-    def constraint_simultaneous_import_export(self,carr1,carr2):
+    def constraint_simultaneous_import_export(self):
         """
         carrier import and export at the same time
         """
+        #get all carriers as a pd.Series
+        #map_and_expand dimension of binary_import_export
+        #binary_import_export = self.map_and_expand(self.variables["binary_import_export"],carriers)
+
         # carr1 limit
-        lhs = self.variables["flow_import"].loc[carr1,:,:]
-        rhs = self.parameters.availability_import.loc[carr1,:,:] * self.variables["binary_import_export"]
+        lhs = self.variables["flow_import"]
+        rhs = self.parameters.availability_import * self.variables["binary_import_export"]
         constraints = lhs <= rhs
 
-        self.constraints.add_constraint("constraint_simultaneous_import_export_import",constraints)
+        self.constraints.add_constraint("constraint_simultaneous_import",constraints)
 
         # carr2 limit
-        lhs = self.variables["flow_export"].loc[carr2,:,:] + self.parameters.availability_export.loc[carr2,:,:] * self.variables["binary_import_export"]
-        rhs = self.parameters.availability_export.loc[carr2,:,:]
+        lhs = self.variables["flow_export"]+ self.parameters.availability_export * self.variables["binary_import_export"]
+        rhs = self.parameters.availability_export
         constraints = lhs <= rhs
 
         self.constraints.add_constraint("constraint_simultaneous_import_export_export",constraints)

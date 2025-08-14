@@ -108,6 +108,7 @@ class System(Subscriptable):
     use_capacities_existing: bool = True
     allow_investment: bool = True
     storage_charge_discharge_binary: bool = False
+    import_export_binary: bool = False
 
 
 class Solver(Subscriptable):
@@ -122,8 +123,8 @@ class Solver(Subscriptable):
     io_api: str = "lp"
     save_duals: bool = False
     save_parameters: bool = True
-    selected_saved_parameters: list = [] # if empty, all parameters are saved
-    selected_saved_variables: list = [] # if empty, all variables are saved
+    selected_saved_parameters: list = [] # if empty, all parameters are saved "price_import", "price_export", "demand"
+    selected_saved_variables: list = [] # if empty, all variables are saved "net_present_cost","flow_import", "flow_export", "flow_conversion_output", "flow_storage_charge", "flow_storage_discharge", "capacity"
     selected_saved_duals: list = [] # if empty, all duals are saved (if save_duals is True)
     linear_regression_check: dict[str, float] = {
         "eps_intercept": 0.1,
